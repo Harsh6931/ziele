@@ -20,6 +20,14 @@ import {
 function buildPostInclude(viewerProfileId = null) {
   return {
     _count: { select: { comments: true } },
+    author: {
+      select: {
+        id: true,
+        name: true,
+        handle: true,
+        avatar: true,
+      },
+    },
     ...(viewerProfileId
       ? {
           reactions: {
@@ -136,9 +144,33 @@ function scorePostForTrending(post, commentsCount = 0) {
   );
 }
 
+function resolvePostAuthor(post = {}) {
+  const author = post.author || null;
+  return {
+    profileId: author?.id || post.profileId || null,
+    authorName: author?.name || post.authorName || "Ziele User",
+    authorHandle: author?.handle || post.authorHandle || "@zieleuser",
+    avatar: author?.avatar || post.avatar || "ZU",
+  };
+}
+
+function formatComment(comment) {
+  const author = comment?.author || null;
+
+  return {
+    ...comment,
+    profileId: author?.id || comment.profileId || null,
+    authorName: author?.name || comment.authorName || "Ziele User",
+    authorHandle: author?.handle || comment.authorHandle || "@zieleuser",
+    avatar: author?.avatar || comment.avatar || "ZU",
+    time: formatRelativeTime(comment.createdAt),
+  };
+}
+
 function enrichPost(post, viewerProfileId, followingSet) {
   if (!post) return null;
 
+  const author = resolvePostAuthor(post);
   const contentText = stripHtml(post.content || "");
   const mediaUrl = String(post.mediaUrl || post.coverUrl || "").trim();
   const mediaType =
@@ -146,6 +178,7 @@ function enrichPost(post, viewerProfileId, followingSet) {
 
   return {
     ...post,
+    ...author,
     mediaUrl,
     mediaType,
     mediaSource: String(post.mediaSource || "").trim(),
@@ -157,8 +190,8 @@ function enrichPost(post, viewerProfileId, followingSet) {
     readTime: estimateReadTime(post.content),
     comments: post._count?.comments || 0,
     viewsLabel: formatCompactNumber(post.views || 0),
-    isFollowingAuthor: Boolean(post.profileId && followingSet.has(post.profileId)),
-    isOwnAuthor: Boolean(viewerProfileId && post.profileId === viewerProfileId),
+    isFollowingAuthor: Boolean(author.profileId && followingSet.has(author.profileId)),
+    isOwnAuthor: Boolean(viewerProfileId && author.profileId === viewerProfileId),
     viewerReaction: post.reactions?.[0]?.type || null,
     isBookmarked: Boolean(post.bookmarksRel?.length),
   };
@@ -474,12 +507,19 @@ export async function getCommentsByPostId(postId) {
   const comments = await prisma.comment.findMany({
     where: { postId: parsedPostId },
     orderBy: { createdAt: "desc" },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          handle: true,
+          avatar: true,
+        },
+      },
+    },
   });
 
-  return comments.map((comment) => ({
-    ...comment,
-    time: formatRelativeTime(comment.createdAt),
-  }));
+  return comments.map(formatComment);
 }
 
 export async function createComment(postId, input) {
@@ -505,12 +545,19 @@ export async function createComment(postId, input) {
       avatar: sanitizePlainText(input.avatar || "YU").slice(0, 8),
       content,
     },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          handle: true,
+          avatar: true,
+        },
+      },
+    },
   });
 
-  return {
-    ...comment,
-    time: formatRelativeTime(comment.createdAt),
-  };
+  return formatComment(comment);
 }
 
 export async function getPostOwnerProfile(postId) {
@@ -1116,9 +1163,10 @@ export async function getTrendingData(query = {}, viewerProfileId = null) {
   ]);
 
   const filtered = posts.filter((post) => {
+    const authorIdentity = resolvePostAuthor(post);
     const title = (post.title || "").toLowerCase();
     const summary = stripHtml(post.content || "").toLowerCase();
-    const author = (post.authorName || "").toLowerCase();
+    const author = (authorIdentity.authorName || "").toLowerCase();
     const matchesSearch =
       !search ||
       title.includes(search) ||
@@ -1149,22 +1197,24 @@ export async function getTrendingData(query = {}, viewerProfileId = null) {
   const authorScores = new Map();
 
   rankedEntries.forEach(({ post, score }) => {
+    const authorIdentity = resolvePostAuthor(post);
+
     (post.tags || []).forEach((tag) => {
       tagScores.set(tag, (tagScores.get(tag) || 0) + score);
     });
 
-    const current = authorScores.get(post.profileId) || {
-      id: post.profileId,
-      name: post.authorName,
-      handle: post.authorHandle,
-      avatar: post.avatar,
+    const current = authorScores.get(authorIdentity.profileId) || {
+      id: authorIdentity.profileId,
+      name: authorIdentity.authorName,
+      handle: authorIdentity.authorHandle,
+      avatar: authorIdentity.avatar,
       score: 0,
       posts: 0,
     };
 
     current.score += score;
     current.posts += 1;
-    authorScores.set(post.profileId, current);
+    authorScores.set(authorIdentity.profileId, current);
   });
 
   const topics = [...tagScores.entries()]

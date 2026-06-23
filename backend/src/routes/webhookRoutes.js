@@ -42,7 +42,6 @@ router.post(
           const updated = await upsertUserFromClerk(data || {});
 
           await patchUserByClerkId(updated?.clerkId || data?.id, {
-            username: data?.username || updated?.username || "",
             imageUrl: data?.image_url || updated?.imageUrl || "",
           });
 

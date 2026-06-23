@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Navigate, Routes, Route, useLocation } from "react-router-dom";
 import "./styles/variables.css";
 import "./styles/base.css";
 import "./styles/layout.css";
@@ -26,14 +26,22 @@ import LandingPage from "./pages/LandingPage";
 import FloatingPanel from "./components/FloatingPanel";
 
 // IMPORT: Clerk Auth helper components to handle route protection
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
 
 // HELPER: Component to protect specific private routes
 const ProtectedRoute = ({ children }) => {
+  const location = useLocation();
+  const redirectUrl = `${location.pathname}${location.search}`;
+
   return (
     <>
       <SignedIn>{children}</SignedIn>
-      <SignedOut><RedirectToSignIn /></SignedOut>
+      <SignedOut>
+        <Navigate
+          to={`/sign-up?redirect_url=${encodeURIComponent(redirectUrl)}`}
+          replace
+        />
+      </SignedOut>
     </>
   );
 };

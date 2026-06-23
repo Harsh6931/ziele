@@ -64,9 +64,9 @@ function deriveHandleCandidate(clerkUser = {}, email = "", name = "") {
   const username = normalizeString(clerkUser.username);
   if (username) return `@${username}`;
   const fromName = slugify(name);
-  if (fromName) return `@${fromName}`;
+  if (fromName) return `@${fromName}${randomSuffix(4)}`;
   const fromEmail = slugify(email.split("@")[0]);
-  if (fromEmail) return `@${fromEmail}`;
+  if (fromEmail) return `@${fromEmail}${randomSuffix(4)}`;
   return `@user${randomSuffix(4)}`;
 }
 
@@ -118,7 +118,6 @@ export async function upsertUserFromClerk(clerkUser) {
 
   const email = getPrimaryEmail(clerkUser);
   const displayName = getDisplayName(clerkUser);
-  const username = normalizeString(clerkUser.username);
   const firstName = normalizeString(clerkUser.first_name || clerkUser.firstName);
   const lastName = normalizeString(clerkUser.last_name || clerkUser.lastName);
   const imageUrl = normalizeString(clerkUser.image_url || clerkUser.imageUrl);
@@ -137,7 +136,7 @@ export async function upsertUserFromClerk(clerkUser) {
       data: {
         clerkId,
         email,
-        username,
+        username: handle.replace(/^@/, ""),
         firstName,
         lastName,
         imageUrl,
@@ -162,24 +161,12 @@ export async function upsertUserFromClerk(clerkUser) {
       where: { clerkId },
       data: {
         email,
-        username,
         firstName,
         lastName,
         imageUrl
       },
       include: { profile: true }
     });
-
-    // Optionally update profile name if it changed
-    if (updatedUser.profile && displayName !== updatedUser.profile.name) {
-      await prisma.profile.update({
-        where: { clerkId },
-        data: {
-          name: displayName,
-          avatar: makeAvatar(displayName)
-        }
-      });
-    }
 
     return updatedUser;
   }

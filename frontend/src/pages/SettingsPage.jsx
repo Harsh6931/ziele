@@ -452,20 +452,6 @@ function SettingsPage() {
         bio: normalizedBio,
       });
 
-      let clerkSyncWarning = "";
-      if (
-        user &&
-        typeof user.update === "function" &&
-        normalizeUsername(user.username || "") !== normalizedUsername
-      ) {
-        try {
-          await user.update({ username: normalizedUsername });
-        } catch {
-          clerkSyncWarning =
-            "Settings were saved, but Clerk username could not be synced here. Use Account -> Manage account details.";
-        }
-      }
-
       const mergedEmail = getLoginEmail(user, updatedProfile?.email || settings.email);
       const mergedUsername = normalizeUsername(
         updatedProfile?.username || updatedProfile?.handle || normalizedUsername,
@@ -482,7 +468,7 @@ function SettingsPage() {
       displayNameEditedRef.current = false;
       usernameEditedRef.current = false;
       setSaved(true);
-      setInfoMessage(clerkSyncWarning || "Settings saved successfully.");
+      setInfoMessage("Profile settings saved successfully.");
     } catch (error) {
       setErrorMessage(error?.message || "Failed to save settings.");
     } finally {
@@ -654,7 +640,7 @@ function SettingsPage() {
             >
               <h2 id="settings-profile-title">Profile Settings</h2>
               <p className="settings-section-desc">
-                Display name and username stay synced with your profile identity.
+                Your public display name and username live in Ziele and update across your profile, posts, and comments.
               </p>
 
               <div className="settings-field">
@@ -928,7 +914,7 @@ function SettingsPage() {
                 <div className="settings-account-card">
                   <div>
                     <h4>Manage Account Details</h4>
-                    <p>Open Clerk profile to edit security, session, and identity details.</p>
+                    <p>Open Clerk profile to manage security, sessions, and authentication details.</p>
                   </div>
                   <button
                     type="button"

@@ -29,6 +29,17 @@ function toHandle(username = "") {
   return normalized ? `@${normalized}` : "";
 }
 
+function makeAvatar(name = "") {
+  const words = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) return "ZU";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
+}
+
 export const getAllProfiles = async (req, res) => {
   try {
     const authProfile = await resolveAuthProfile(req);
@@ -80,9 +91,7 @@ export const getCurrentProfile = async (req, res) => {
     return res.json({
       ...profile,
       email: user?.email || null,
-      username:
-        user?.username ||
-        normalizeUsername(profile?.handle || authProfile.handle || ""),
+      username: normalizeUsername(profile?.handle || authProfile.handle || ""),
     });
   } catch (error) {
     return res.status(500).json({ error: "Failed to fetch current profile" });
@@ -160,13 +169,19 @@ export const updateCurrentProfile = async (req, res) => {
       typeof payload.handle === "string" ? payload.handle : undefined;
     const nextHandle =
       nextHandleValue !== undefined ? toHandle(nextHandleValue) : undefined;
+    const resolvedName =
+      nextName !== undefined ? nextName : authProfile.name;
+    const resolvedBio = nextBio !== undefined ? nextBio : authProfile.bio;
+    const resolvedHandle =
+      nextHandle !== undefined ? nextHandle : authProfile.handle;
+    const resolvedAvatar = makeAvatar(resolvedName);
+    const nextProfileId = resolvedHandle.replace(/^@/, "");
 
-    // Check if handle is taken by another user
-    if (nextHandle && nextHandle !== authProfile.handle) {
+    if (resolvedHandle !== authProfile.handle) {
       const existing = await prisma.profile.findFirst({
         where: {
-          handle: nextHandle,
-          id: { not: authProfile.id },
+          OR: [{ handle: resolvedHandle }, { id: nextProfileId }],
+          clerkId: { not: authProfile.clerkId },
         },
       });
       if (existing) {
@@ -178,24 +193,59 @@ export const updateCurrentProfile = async (req, res) => {
       await tx.profile.update({
         where: { id: authProfile.id },
         data: {
-          name: nextName !== undefined ? nextName : authProfile.name,
-          bio: nextBio !== undefined ? nextBio : authProfile.bio,
-          handle: nextHandle !== undefined ? nextHandle : authProfile.handle,
+          id: nextProfileId,
+          name: resolvedName,
+          bio: resolvedBio,
+          handle: resolvedHandle,
+          avatar: resolvedAvatar,
         },
       });
 
-      if (nextHandle !== undefined) {
-        await tx.user.update({
-          where: { clerkId: authProfile.clerkId },
-          data: {
-            username: normalizeUsername(nextHandle),
+      await tx.user.update({
+        where: { clerkId: authProfile.clerkId },
+        data: {
+          username: normalizeUsername(resolvedHandle),
+        },
+      });
+
+      await Promise.all([
+        tx.post.updateMany({
+          where: {
+            OR: [{ profileId: authProfile.id }, { profileId: nextProfileId }],
           },
-        });
-      }
+          data: {
+            authorName: resolvedName,
+            authorHandle: resolvedHandle,
+            avatar: resolvedAvatar,
+          },
+        }),
+        tx.comment.updateMany({
+          where: {
+            OR: [{ profileId: authProfile.id }, { profileId: nextProfileId }],
+          },
+          data: {
+            authorName: resolvedName,
+            authorHandle: resolvedHandle,
+            avatar: resolvedAvatar,
+          },
+        }),
+        tx.notification.updateMany({
+          where: { targetUser: authProfile.id },
+          data: { targetUser: nextProfileId },
+        }),
+        tx.notification.updateMany({
+          where: { sourceHandle: authProfile.handle },
+          data: {
+            sourceName: resolvedName,
+            sourceHandle: resolvedHandle,
+            sourceAvatar: resolvedAvatar,
+          },
+        }),
+      ]);
     });
 
     const [updatedProfile, updatedUser] = await Promise.all([
-      getProfileById(authProfile.id, authProfile.id),
+      getProfileById(nextProfileId, nextProfileId),
       prisma.user.findUnique({
         where: { clerkId: authProfile.clerkId },
         select: {
@@ -209,8 +259,7 @@ export const updateCurrentProfile = async (req, res) => {
       ...updatedProfile,
       email: updatedUser?.email || null,
       username:
-        updatedUser?.username ||
-        normalizeUsername(updatedProfile?.handle || authProfile.handle || ""),
+        normalizeUsername(updatedProfile?.handle || resolvedHandle || authProfile.handle || ""),
     });
   } catch (error) {
     console.error("Failed to update profile", error);

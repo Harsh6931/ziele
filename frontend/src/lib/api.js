@@ -7,7 +7,7 @@
  * returns realistic mock data so the frontend can be developed and demoed
  * without a live database.
  *
- * ⚡  Once the backend is connected to real services, remove
+ * Once the backend is connected to real services, remove
  *     USE_MOCK_FALLBACK or set it to false to disable the fallback path.
  */
 

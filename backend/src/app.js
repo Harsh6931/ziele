@@ -20,14 +20,15 @@ import { appRouter } from "./trpc/routers/_app.js";
 
 const app = express();
 
-// Updated CORS configuration for development and production
+const allowedOrigins =
+  env.corsOrigins.length > 0
+    ? env.corsOrigins
+    : ["http://localhost:5173", "https://ziele-theta.vercel.app"];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173", // Development frontend
-      "https://ziele-theta.vercel.app", // Production frontend
-    ],
-    credentials: true, // Enable credentials for cookies/auth headers
+    origin: allowedOrigins,
+    credentials: true,
   }),
 );
 

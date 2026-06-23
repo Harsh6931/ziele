@@ -66,19 +66,25 @@ function LandingPage({ isDarkTheme = true, onToggleTheme = () => {} }) {
 
           <div className="landing-options">
             <div className="landing-option-card landing-option-card-primary">
-              <h2>Sign in</h2>
+              <h2>Create your account</h2>
               <p>
-                Sync your profile, publish posts, and unlock full social
-                features.
+                New readers and writers start with sign up. We'll pull your
+                first display name from Clerk and create your starting username
+                automatically.
               </p>
 
               <SignedOut>
-                <Link
-                  to="/sign-in"
-                  className="landing-option-btn primary"
-                >
-                  Continue with Sign In
-                </Link>
+                <div className="stack-sm">
+                  <Link
+                    to="/sign-up"
+                    className="landing-option-btn primary"
+                  >
+                    Continue with Sign Up
+                  </Link>
+                  <Link to="/sign-in" className="landing-option-btn secondary">
+                    Already have an account? Sign In
+                  </Link>
+                </div>
               </SignedOut>
 
               <SignedIn>

@@ -284,11 +284,19 @@ function Navbar({ isDarkTheme = true, onToggleTheme = () => {} }) {
         <SignedOut>
           <Link
             to="/sign-in"
-            className="nav-btn nav-btn-primary"
+            className="nav-btn"
             title="Sign in"
             aria-label="Sign in"
           >
             Sign In
+          </Link>
+          <Link
+            to="/sign-up"
+            className="nav-btn nav-btn-primary"
+            title="Create account"
+            aria-label="Create account"
+          >
+            Sign Up
           </Link>
         </SignedOut>
       </div>
