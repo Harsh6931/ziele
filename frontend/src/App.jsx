@@ -97,17 +97,22 @@ function getInitialTheme() {
 function App() {
   const location = useLocation();
   const isLandingPage = location.pathname === "/";
-  const hideSidebar = [
-    "/discover",
-    "/analytics",
-    "/settings",
-    "/drafts",
-    "/bookmarks",
-    "/trending",
-    "/create",
-    "/sign-in",
-    "/sign-up",
-  ].includes(location.pathname);
+  const authShellRoute =
+    location.pathname === "/sign-in" ||
+    location.pathname === "/sign-up" ||
+    location.pathname.startsWith("/sign-in/") ||
+    location.pathname.startsWith("/sign-up/");
+
+  const hideSidebar =
+    [
+      "/discover",
+      "/analytics",
+      "/settings",
+      "/drafts",
+      "/bookmarks",
+      "/trending",
+      "/create",
+    ].includes(location.pathname) || authShellRoute;
 
   const [theme, setTheme] = React.useState(getInitialTheme);
 
@@ -183,8 +188,8 @@ function App() {
             {/* PUBLIC ROUTES: Accessible to everyone */}
             <Route path="/feed" element={<Feed />} />
             <Route path="/home" element={<Feed />} />
-            <Route path="/sign-in" element={<SignInPage />} />
-            <Route path="/sign-up" element={<SignUpPage />} />
+            <Route path="/sign-in/*" element={<SignInPage />} />
+            <Route path="/sign-up/*" element={<SignUpPage />} />
             <Route path="/discover" element={<Discover />} />
             <Route path="/post/:id/:slug?" element={<PostDetail />} />
             <Route path="/trending" element={<TrendingPage />} />
