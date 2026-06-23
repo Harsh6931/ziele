@@ -3,6 +3,14 @@ import app from "./src/app.js";
 import { env } from "./src/config/env.js";
 import { initSocketServer } from "./src/realtime/socketServer.js";
 
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception", error);
+});
+
 // Use process.env.PORT for cloud deployment compatibility
 const PORT = process.env.PORT || env.port || 3000;
 

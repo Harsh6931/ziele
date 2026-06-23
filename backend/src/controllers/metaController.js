@@ -9,12 +9,25 @@ import {
 import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 import { getRedisClient } from "../integrations/redisClient.js";
 
-async function resolveAuthProfile(req) {
+async function resolveAuthProfile(req, options = {}) {
   const clerkUserId = req?.authContext?.userId || null;
   if (!clerkUserId) return null;
-  const profile = await ensureProfileForAuthContext(req.authContext);
-  req.resolvedProfile = profile || null;
-  return profile;
+  try {
+    const profile = await ensureProfileForAuthContext(req.authContext);
+    req.resolvedProfile = profile || null;
+    return profile;
+  } catch (error) {
+    console.error("Failed to sync Clerk profile for request", {
+      clerkUserId,
+      path: req.originalUrl,
+      error: error?.message || error,
+    });
+    if (options.allowSyncFailure) {
+      req.resolvedProfile = null;
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function withCache(key, ttlSeconds, fetcher) {
@@ -38,7 +51,9 @@ async function withCache(key, ttlSeconds, fetcher) {
 
 export const getSidebar = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const cacheKey = `sidebar:${authProfile?.id || "public"}`;
     const data = await withCache(cacheKey, 60, () =>
       getSidebarData(authProfile?.id || null),
@@ -51,7 +66,9 @@ export const getSidebar = async (req, res) => {
 
 export const getDiscover = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const query = req.validatedQuery || req.query || {};
     const cacheKey = `discover:${authProfile?.id || "public"}:${JSON.stringify(query)}`;
     const data = await withCache(cacheKey, 60, () =>
@@ -65,7 +82,9 @@ export const getDiscover = async (req, res) => {
 
 export const getRecommendations = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const query = req.validatedQuery || req.query || {};
     const cacheKey = `recs:${authProfile?.id || "public"}:${JSON.stringify(query)}`;
     const data = await withCache(cacheKey, 60, () =>
@@ -79,7 +98,9 @@ export const getRecommendations = async (req, res) => {
 
 export const getTrending = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const query = req.validatedQuery || req.query || {};
     const cacheKey = `trending:${authProfile?.id || "public"}:${JSON.stringify(query)}`;
     const data = await withCache(cacheKey, 120, () =>

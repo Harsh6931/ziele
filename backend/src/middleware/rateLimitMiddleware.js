@@ -28,19 +28,27 @@ function checkInMemoryWindow(key, windowMs) {
 }
 
 async function checkRedisWindow(key, windowSeconds) {
-  const redis = await getRedisClient().catch(() => null);
-  if (!redis) return null;
+  try {
+    const redis = await getRedisClient().catch(() => null);
+    if (!redis) return null;
 
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, windowSeconds);
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+
+    const ttlSeconds = await redis.ttl(key);
+    return {
+      count,
+      expiresAt: Date.now() + Math.max(1, ttlSeconds) * 1000,
+    };
+  } catch (error) {
+    console.error("Rate limiter Redis check failed; using memory fallback", {
+      key,
+      error: error?.message || error,
+    });
+    return null;
   }
-
-  const ttlSeconds = await redis.ttl(key);
-  return {
-    count,
-    expiresAt: Date.now() + Math.max(1, ttlSeconds) * 1000,
-  };
 }
 
 export function createRateLimiter({

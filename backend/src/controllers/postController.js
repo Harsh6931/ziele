@@ -26,12 +26,25 @@ function statusFromError(error, fallback = 400) {
   return Number(error?.statusCode || fallback);
 }
 
-async function resolveAuthProfile(req) {
+async function resolveAuthProfile(req, options = {}) {
   const clerkUserId = req?.authContext?.userId || null;
   if (!clerkUserId) return null;
-  const profile = await ensureProfileForAuthContext(req.authContext);
-  req.resolvedProfile = profile || null;
-  return profile;
+  try {
+    const profile = await ensureProfileForAuthContext(req.authContext);
+    req.resolvedProfile = profile || null;
+    return profile;
+  } catch (error) {
+    console.error("Failed to sync Clerk profile for request", {
+      clerkUserId,
+      path: req.originalUrl,
+      error: error?.message || error,
+    });
+    if (options.allowSyncFailure) {
+      req.resolvedProfile = null;
+      return null;
+    }
+    throw error;
+  }
 }
 
 function applyAuthenticatedAuthor(input = {}, profile = null) {
@@ -48,10 +61,19 @@ function applyAuthenticatedAuthor(input = {}, profile = null) {
 
 export const getAllPosts = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const posts = await getPosts(authProfile?.id || null);
     res.json(posts);
   } catch (error) {
+    console.error("Failed to fetch posts", {
+      path: req.originalUrl,
+      clerkUserId: req?.authContext?.userId || null,
+      error: error?.message || error,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res.status(500).json({ error: "Failed to fetch posts" });
   }
 };
@@ -59,7 +81,9 @@ export const getAllPosts = async (req, res) => {
 export const getPostById = async (req, res) => {
   try {
     const { id } = req.params;
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const post = await getPostByIdModel(id, authProfile?.id || null);
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
@@ -73,6 +97,9 @@ export const getPostById = async (req, res) => {
 export const createPostItem = async (req, res) => {
   try {
     const authProfile = await resolveAuthProfile(req);
+    if (!authProfile?.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const payload = applyAuthenticatedAuthor(
       req.validatedBody || req.body || {},
       authProfile,
@@ -81,6 +108,14 @@ export const createPostItem = async (req, res) => {
     const post = await createPost(payload);
     res.status(201).json(post);
   } catch (error) {
+    console.error("Failed to create post", {
+      path: req.originalUrl,
+      clerkUserId: req?.authContext?.userId || null,
+      profileId: req.resolvedProfile?.id || null,
+      error: error?.message || error,
+      code: error?.code,
+      meta: error?.meta,
+    });
     res
       .status(statusFromError(error))
       .json({ error: error.message || "Failed to create post" });
@@ -126,7 +161,9 @@ export const deletePostItem = async (req, res) => {
 
 export const getRandomPostItem = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const post = await getRandomPost(authProfile?.id || null);
     if (!post) {
       return res.status(404).json({ error: "No posts available" });
@@ -185,7 +222,9 @@ export const createPostComment = async (req, res) => {
 
 export const getRelatedPostItems = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const relatedPosts = await getRelatedPosts(
       req.params.id,
       authProfile?.id || null,

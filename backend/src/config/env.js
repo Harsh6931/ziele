@@ -1,7 +1,8 @@
 import "dotenv/config";
 
 function normalizeString(value, fallback = "") {
-  return typeof value === "string" ? value.trim() : fallback;
+  if (typeof value !== "string") return fallback;
+  return value.trim().replace(/^["']|["']$/g, "");
 }
 
 function parseNumber(value, fallback) {

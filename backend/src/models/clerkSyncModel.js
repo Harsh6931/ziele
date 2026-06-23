@@ -1,3 +1,4 @@
+import { clerkClient } from "@clerk/express";
 import { prisma } from "./prismaClient.js";
 
 // ============================================================================
@@ -39,6 +40,9 @@ function getPrimaryEmail(clerkUser = {}) {
   if (clerkUser.primary_email_address) {
     return normalizeEmail(clerkUser.primary_email_address);
   }
+  if (clerkUser.primaryEmailAddress?.emailAddress) {
+    return normalizeEmail(clerkUser.primaryEmailAddress.emailAddress);
+  }
   if (
     Array.isArray(clerkUser.email_addresses) &&
     clerkUser.email_addresses.length > 0
@@ -48,6 +52,16 @@ function getPrimaryEmail(clerkUser = {}) {
       clerkUser.email_addresses.find((entry) => entry.id === primaryId) ||
       clerkUser.email_addresses[0];
     return normalizeEmail(picked?.email_address);
+  }
+  if (
+    Array.isArray(clerkUser.emailAddresses) &&
+    clerkUser.emailAddresses.length > 0
+  ) {
+    const primaryId = clerkUser.primaryEmailAddressId;
+    const picked =
+      clerkUser.emailAddresses.find((entry) => entry.id === primaryId) ||
+      clerkUser.emailAddresses[0];
+    return normalizeEmail(picked?.emailAddress || picked?.email_address);
   }
   return "";
 }
@@ -132,6 +146,18 @@ export function clerkUserFromAuthContext(authContext = {}) {
   };
 }
 
+async function getClerkUserFromApi(clerkId) {
+  try {
+    return await clerkClient.users.getUser(clerkId);
+  } catch (error) {
+    console.error("Failed to fetch Clerk user for local sync", {
+      clerkId,
+      error: error?.message || error,
+    });
+    return null;
+  }
+}
+
 async function getUniqueHandle(baseHandle) {
   let candidate = normalizeHandle(baseHandle || "@user");
   let exists = await prisma.profile.findUnique({
@@ -182,9 +208,16 @@ export async function ensureProfileForAuthContext(authContext = {}) {
   if (!clerkId) return null;
 
   const existingProfile = await findProfileByClerkId(clerkId);
-  if (existingProfile) return existingProfile;
+  if (
+    existingProfile &&
+    existingProfile.name !== "Ziele User" &&
+    existingProfile.avatar !== "ZU"
+  ) {
+    return existingProfile;
+  }
 
-  const clerkUser = clerkUserFromAuthContext(authContext);
+  const clerkUser =
+    (await getClerkUserFromApi(clerkId)) || clerkUserFromAuthContext(authContext);
   if (!clerkUser) return null;
 
   const syncedUser = await upsertUserFromClerk(clerkUser);
@@ -247,6 +280,10 @@ export async function upsertUserFromClerk(clerkUser) {
       displayName,
     );
     const profileData = existingUser.profile ? null : await createProfileData();
+    const shouldRefreshProfileIdentity =
+      existingUser.profile &&
+      (existingUser.profile.name === "Ziele User" ||
+        existingUser.profile.avatar === "ZU");
     const updatedUser = await prisma.user.update({
       where: { clerkId },
       data: {
@@ -262,6 +299,15 @@ export async function upsertUserFromClerk(clerkUser) {
                 create: profileData,
               },
             }
+          : shouldRefreshProfileIdentity
+            ? {
+                profile: {
+                  update: {
+                    name: displayName,
+                    avatar: makeAvatar(displayName),
+                  },
+                },
+              }
           : {}),
       },
       include: { profile: true },

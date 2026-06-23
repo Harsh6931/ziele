@@ -9,12 +9,25 @@ import { prisma } from "../models/prismaClient.js";
 import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 import { notifyProfile } from "../services/notificationService.js";
 
-async function resolveAuthProfile(req) {
+async function resolveAuthProfile(req, options = {}) {
   const clerkUserId = req?.authContext?.userId || null;
   if (!clerkUserId) return null;
-  const profile = await ensureProfileForAuthContext(req.authContext);
-  req.resolvedProfile = profile || null;
-  return profile;
+  try {
+    const profile = await ensureProfileForAuthContext(req.authContext);
+    req.resolvedProfile = profile || null;
+    return profile;
+  } catch (error) {
+    console.error("Failed to sync Clerk profile for request", {
+      clerkUserId,
+      path: req.originalUrl,
+      error: error?.message || error,
+    });
+    if (options.allowSyncFailure) {
+      req.resolvedProfile = null;
+      return null;
+    }
+    throw error;
+  }
 }
 
 function normalizeUsername(value = "") {
@@ -42,7 +55,9 @@ function makeAvatar(name = "") {
 
 export const getAllProfiles = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     res.json(await getProfiles(authProfile?.id || null));
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch profiles" });
@@ -51,7 +66,9 @@ export const getAllProfiles = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const authProfile = await resolveAuthProfile(req);
+    const authProfile = await resolveAuthProfile(req, {
+      allowSyncFailure: true,
+    });
     const profile = await getProfileById(
       req.params.id || "omansh",
       authProfile?.id || null,

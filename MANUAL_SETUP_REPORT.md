@@ -40,7 +40,6 @@ Required backend values:
 Required frontend values:
 - `VITE_CLERK_PUBLISHABLE_KEY`
 - `VITE_API_BASE_URL`
-- `VITE_USE_MOCK_FALLBACK` (`false` in production, `true` for offline/dev fallback)
 
 ## 3) Database and schema actions (manual)
 

@@ -14,12 +14,8 @@ import {
   getProfileById as mockGetProfileById,
   getCommentsByPostId as mockGetCommentsByPostId,
   addComment as mockAddComment,
-  deleteComment as mockDeleteComment,
 } from "../data/mockData";
 
-const USE_MOCK_FALLBACK =
-  String(import.meta.env.VITE_USE_MOCK_FALLBACK || "true").toLowerCase() ===
-  "true";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
@@ -37,7 +33,7 @@ async function buildHeaders(options = {}) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (authTokenGetter && !headers.has("Authorization")) {
+  if (!options.skipAuth && authTokenGetter && !headers.has("Authorization")) {
     try {
       const token = await authTokenGetter();
       if (token) {
@@ -51,13 +47,15 @@ async function buildHeaders(options = {}) {
   return headers;
 }
 
-async function parseResponse(response) {
+async function parseResponse(response, requestLabel = "request") {
   const contentType = response.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");
   const body = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    throw new Error(body?.error || `Request failed with status ${response.status}`);
+    throw new Error(
+      body?.error || `${requestLabel} failed with status ${response.status}`,
+    );
   }
 
   return body;
@@ -65,24 +63,28 @@ async function parseResponse(response) {
 
 export async function fetchJson(path, options = {}) {
   const headers = await buildHeaders(options);
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  const url = `${API_BASE_URL}${path}`;
+  const method = String(options.method || "GET").toUpperCase();
+  const fetchOptions = { ...options };
+  delete fetchOptions.skipAuth;
+  let response;
 
-  return parseResponse(response);
+  try {
+    response = await fetch(url, {
+      ...fetchOptions,
+      headers,
+    });
+  } catch (error) {
+    throw new Error(
+      `Network error calling ${method} ${url}: ${error?.message || "Failed to fetch"}`,
+    );
+  }
+
+  return parseResponse(response, `${method} ${url}`);
 }
 
-function withFallback(realFn, mockFn) {
-  return async (...args) => {
-    if (!USE_MOCK_FALLBACK) return realFn(...args);
-
-    try {
-      return await realFn(...args);
-    } catch {
-      return typeof mockFn === "function" ? mockFn(...args) : mockFn;
-    }
-  };
+function withFallback(realFn, _mockFn) {
+  return async (...args) => realFn(...args);
 }
 
 function delay(ms = 150) {
@@ -204,7 +206,7 @@ function localModerationResult({ title = "", text = "" }) {
 }
 
 export const getPosts = withFallback(
-  () => fetchJson("/api/posts"),
+  () => fetchJson("/api/posts", { skipAuth: true }),
   async () => {
     await delay();
     return mockPosts.map(adaptPostForFeed);
@@ -212,7 +214,7 @@ export const getPosts = withFallback(
 );
 
 export const getPostById = withFallback(
-  (id) => fetchJson(`/api/posts/${id}`),
+  (id) => fetchJson(`/api/posts/${id}`, { skipAuth: true }),
   async (id) => {
     await delay();
     const post = mockGetPostById(id);
@@ -221,7 +223,7 @@ export const getPostById = withFallback(
 );
 
 export const getRelatedPosts = withFallback(
-  (id) => fetchJson(`/api/posts/${id}/related`),
+  (id) => fetchJson(`/api/posts/${id}/related`, { skipAuth: true }),
   async (id) => {
     await delay();
     return mockGetRelatedPosts(id).map(adaptPostForFeed);
@@ -229,7 +231,7 @@ export const getRelatedPosts = withFallback(
 );
 
 export const getRandomPost = withFallback(
-  () => fetchJson("/api/posts/random"),
+  () => fetchJson("/api/posts/random", { skipAuth: true }),
   async () => {
     await delay(80);
     return mockGetRandomPost();
@@ -237,7 +239,7 @@ export const getRandomPost = withFallback(
 );
 
 export const getPostComments = withFallback(
-  (id) => fetchJson(`/api/posts/${id}/comments`),
+  (id) => fetchJson(`/api/posts/${id}/comments`, { skipAuth: true }),
   async (id) => {
     await delay();
     return mockGetCommentsByPostId(id);
@@ -277,16 +279,7 @@ async function deleteCommentRequest(id) {
   }
 }
 
-export const deleteComment = USE_MOCK_FALLBACK
-  ? async (id) => {
-      try {
-        return await deleteCommentRequest(id);
-      } catch {
-        await delay(100);
-        mockDeleteComment(id);
-      }
-    }
-  : deleteCommentRequest;
+export const deleteComment = deleteCommentRequest;
 
 export const createPost = withFallback(
   (payload) =>
@@ -407,14 +400,8 @@ export async function uploadPostMedia(file) {
     });
 
     return parseResponse(response);
-  } catch {
-    if (!USE_MOCK_FALLBACK) throw new Error("Media upload failed");
-    await delay(400);
-    return {
-      url: `https://placehold.co/800x400?text=${encodeURIComponent(file.name)}`,
-      mediaType: file.type?.startsWith("video") ? "video" : "image",
-      mediaSource: "upload",
-    };
+  } catch (error) {
+    throw new Error(error?.message || "Media upload failed");
   }
 }
 
@@ -514,7 +501,7 @@ export const markNotificationsRead = withFallback(
 );
 
 export const getProfile = withFallback(
-  (id) => fetchJson(`/api/profiles/${id}`),
+  (id) => fetchJson(`/api/profiles/${id}`, { skipAuth: true }),
   async (id) => {
     await delay();
     const profile = mockGetProfileById(id);
@@ -562,7 +549,7 @@ export const unfollowProfile = withFallback(
 );
 
 export const getSidebarData = withFallback(
-  () => fetchJson("/api/meta/sidebar"),
+  () => fetchJson("/api/meta/sidebar", { skipAuth: true }),
   async () => {
     await delay();
     return {
@@ -583,7 +570,7 @@ export const getDiscoverData = withFallback(
     if (params.q) query.set("q", params.q);
     if (params.tag) query.set("tag", params.tag);
     const suffix = query.toString() ? `?${query.toString()}` : "";
-    return fetchJson(`/api/meta/discover${suffix}`);
+    return fetchJson(`/api/meta/discover${suffix}`, { skipAuth: true });
   },
   async (params = {}) => {
     await delay();
@@ -680,7 +667,7 @@ export const getRecommendationsData = withFallback(
     const query = new URLSearchParams();
     if (params.limit) query.set("limit", String(params.limit));
     const suffix = query.toString() ? `?${query.toString()}` : "";
-    return fetchJson(`/api/meta/recommendations${suffix}`);
+    return fetchJson(`/api/meta/recommendations${suffix}`, { skipAuth: true });
   },
   async () => {
     await delay(120);
@@ -695,7 +682,7 @@ export const getTrendingData = withFallback(
     if (params.tag) query.set("tag", params.tag);
     if (params.limit) query.set("limit", String(params.limit));
     const suffix = query.toString() ? `?${query.toString()}` : "";
-    return fetchJson(`/api/meta/trending${suffix}`);
+    return fetchJson(`/api/meta/trending${suffix}`, { skipAuth: true });
   },
   async () => {
     await delay(140);
@@ -728,7 +715,7 @@ export const getCommunitiesData = withFallback(
     if (params.q) query.set("q", params.q);
     if (params.tag) query.set("tag", params.tag);
     const suffix = query.toString() ? `?${query.toString()}` : "";
-    return fetchJson(`/api/meta/communities${suffix}`);
+    return fetchJson(`/api/meta/communities${suffix}`, { skipAuth: true });
   },
   async () => {
     await delay(140);
