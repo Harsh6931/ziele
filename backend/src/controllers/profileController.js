@@ -6,13 +6,13 @@ import {
   unfollowProfileByIds,
 } from "../models/profileModel.js";
 import { prisma } from "../models/prismaClient.js";
-import { getProfileForClerkUser } from "../models/clerkSyncModel.js";
+import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 import { notifyProfile } from "../services/notificationService.js";
 
 async function resolveAuthProfile(req) {
   const clerkUserId = req?.authContext?.userId || null;
   if (!clerkUserId) return null;
-  const profile = await getProfileForClerkUser(clerkUserId);
+  const profile = await ensureProfileForAuthContext(req.authContext);
   req.resolvedProfile = profile || null;
   return profile;
 }
@@ -169,8 +169,7 @@ export const updateCurrentProfile = async (req, res) => {
       typeof payload.handle === "string" ? payload.handle : undefined;
     const nextHandle =
       nextHandleValue !== undefined ? toHandle(nextHandleValue) : undefined;
-    const resolvedName =
-      nextName !== undefined ? nextName : authProfile.name;
+    const resolvedName = nextName !== undefined ? nextName : authProfile.name;
     const resolvedBio = nextBio !== undefined ? nextBio : authProfile.bio;
     const resolvedHandle =
       nextHandle !== undefined ? nextHandle : authProfile.handle;
@@ -258,8 +257,9 @@ export const updateCurrentProfile = async (req, res) => {
     res.json({
       ...updatedProfile,
       email: updatedUser?.email || null,
-      username:
-        normalizeUsername(updatedProfile?.handle || resolvedHandle || authProfile.handle || ""),
+      username: normalizeUsername(
+        updatedProfile?.handle || resolvedHandle || authProfile.handle || "",
+      ),
     });
   } catch (error) {
     console.error("Failed to update profile", error);

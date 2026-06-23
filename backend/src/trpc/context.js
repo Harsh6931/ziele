@@ -11,6 +11,8 @@ export function createTrpcContext({ req, res }) {
       userId: auth?.userId || null,
       sessionId: auth?.sessionId || null,
       orgId: auth?.orgId || null,
+      actor: auth?.actor || null,
+      raw: auth || null,
     },
   };
 }

@@ -1,10 +1,10 @@
 import { deleteCommentById } from "../models/postModel.js";
-import { getProfileForClerkUser } from "../models/clerkSyncModel.js";
+import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 
 async function resolveAuthProfile(req) {
   const clerkUserId = req?.authContext?.userId || null;
   if (!clerkUserId) return null;
-  const profile = await getProfileForClerkUser(clerkUserId);
+  const profile = await ensureProfileForAuthContext(req.authContext);
   req.resolvedProfile = profile || null;
   return profile;
 }
@@ -23,6 +23,8 @@ export const deleteComment = async (req, res) => {
     res.status(204).send();
   } catch (error) {
     const status = Number(error?.statusCode || 500);
-    res.status(status).json({ error: error.message || "Failed to delete comment" });
+    res
+      .status(status)
+      .json({ error: error.message || "Failed to delete comment" });
   }
 };

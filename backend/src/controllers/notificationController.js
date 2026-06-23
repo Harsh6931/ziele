@@ -1,4 +1,4 @@
-import { getProfileForClerkUser } from "../models/clerkSyncModel.js";
+import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 import {
   getUnreadNotificationsCount,
   listNotificationsForProfile,
@@ -8,7 +8,7 @@ import {
 async function resolveAuthProfile(req) {
   const clerkUserId = req?.authContext?.userId || null;
   const profile = clerkUserId
-    ? await getProfileForClerkUser(clerkUserId)
+    ? await ensureProfileForAuthContext(req.authContext)
     : null;
   req.resolvedProfile = profile || null;
   return profile;
@@ -59,6 +59,8 @@ export const markAllNotificationsAsRead = async (req, res) => {
     await markNotificationsRead(profile.id);
     return res.json({ ok: true });
   } catch (error) {
-    return res.status(500).json({ error: "Failed to mark notifications as read" });
+    return res
+      .status(500)
+      .json({ error: "Failed to mark notifications as read" });
   }
 };

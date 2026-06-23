@@ -13,7 +13,7 @@ import {
   toggleReaction,
   updatePostById,
 } from "../models/postModel.js";
-import { getProfileForClerkUser } from "../models/clerkSyncModel.js";
+import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 import { cloudinary } from "../integrations/cloudinaryClient.js";
 import { getServiceReadinessSnapshot } from "../config/env.js";
 import { notifyProfile } from "../services/notificationService.js";
@@ -29,7 +29,7 @@ function statusFromError(error, fallback = 400) {
 async function resolveAuthProfile(req) {
   const clerkUserId = req?.authContext?.userId || null;
   if (!clerkUserId) return null;
-  const profile = await getProfileForClerkUser(clerkUserId);
+  const profile = await ensureProfileForAuthContext(req.authContext);
   req.resolvedProfile = profile || null;
   return profile;
 }
@@ -295,7 +295,9 @@ export const uploadPostMediaItem = async (req, res) => {
     }
 
     if (!req.file?.buffer) {
-      return res.status(400).json({ error: "Please attach an image or video file." });
+      return res
+        .status(400)
+        .json({ error: "Please attach an image or video file." });
     }
 
     const mediaType = assertUploadMimeType(req.file.mimetype);

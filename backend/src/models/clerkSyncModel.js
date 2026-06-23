@@ -35,21 +35,38 @@ function randomSuffix(length = 4) {
 
 function getPrimaryEmail(clerkUser = {}) {
   if (clerkUser.email) return normalizeEmail(clerkUser.email);
-  if (Array.isArray(clerkUser.email_addresses) && clerkUser.email_addresses.length > 0) {
+  if (clerkUser.email_address) return normalizeEmail(clerkUser.email_address);
+  if (clerkUser.primary_email_address) {
+    return normalizeEmail(clerkUser.primary_email_address);
+  }
+  if (
+    Array.isArray(clerkUser.email_addresses) &&
+    clerkUser.email_addresses.length > 0
+  ) {
     const primaryId = clerkUser.primary_email_address_id;
-    const picked = clerkUser.email_addresses.find((entry) => entry.id === primaryId) || clerkUser.email_addresses[0];
+    const picked =
+      clerkUser.email_addresses.find((entry) => entry.id === primaryId) ||
+      clerkUser.email_addresses[0];
     return normalizeEmail(picked?.email_address);
   }
   return "";
 }
 
+function getFallbackEmail(clerkId) {
+  return `${slugify(clerkId) || randomSuffix(8)}@clerk.local`;
+}
+
 function getDisplayName(clerkUser = {}) {
-  const firstName = normalizeString(clerkUser.first_name || clerkUser.firstName);
+  const firstName = normalizeString(
+    clerkUser.first_name || clerkUser.firstName,
+  );
   const lastName = normalizeString(clerkUser.last_name || clerkUser.lastName);
   const full = `${firstName} ${lastName}`.trim();
 
   if (full) return full;
-  if (normalizeString(clerkUser.username)) return normalizeString(clerkUser.username);
+  if (normalizeString(clerkUser.name)) return normalizeString(clerkUser.name);
+  if (normalizeString(clerkUser.username))
+    return normalizeString(clerkUser.username);
   return "Ziele User";
 }
 
@@ -63,6 +80,8 @@ function makeAvatar(name) {
 function deriveHandleCandidate(clerkUser = {}, email = "", name = "") {
   const username = normalizeString(clerkUser.username);
   if (username) return `@${username}`;
+  const nickname = normalizeString(clerkUser.nickname);
+  if (nickname) return `@${nickname}`;
   const fromName = slugify(name);
   if (fromName) return `@${fromName}${randomSuffix(4)}`;
   const fromEmail = slugify(email.split("@")[0]);
@@ -70,16 +89,63 @@ function deriveHandleCandidate(clerkUser = {}, email = "", name = "") {
   return `@user${randomSuffix(4)}`;
 }
 
+function buildProfileCreateData(clerkUser, email, displayName) {
+  const handleCandidate = deriveHandleCandidate(clerkUser, email, displayName);
+
+  return async function createData() {
+    const handle = await getUniqueHandle(handleCandidate);
+    const profileId = handle.replace(/^@/, "");
+
+    return {
+      id: profileId,
+      name: displayName,
+      handle,
+      avatar: makeAvatar(displayName),
+      joined: new Date().toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+    };
+  };
+}
+
+export function clerkUserFromAuthContext(authContext = {}) {
+  const claims =
+    authContext?.raw?.sessionClaims || authContext?.sessionClaims || {};
+  const clerkId = normalizeString(authContext?.userId || claims.sub);
+
+  if (!clerkId) return null;
+
+  return {
+    id: clerkId,
+    email:
+      claims.email ||
+      claims.email_address ||
+      claims.primary_email_address ||
+      claims.primaryEmailAddress,
+    first_name: claims.given_name || claims.first_name || claims.firstName,
+    last_name: claims.family_name || claims.last_name || claims.lastName,
+    name: claims.name,
+    username: claims.username || claims.preferred_username,
+    nickname: claims.nickname,
+    image_url: claims.picture || claims.image_url || claims.imageUrl,
+  };
+}
+
 async function getUniqueHandle(baseHandle) {
   let candidate = normalizeHandle(baseHandle || "@user");
-  let exists = await prisma.profile.findUnique({ where: { handle: candidate }});
-  
+  let exists = await prisma.profile.findUnique({
+    where: { handle: candidate },
+  });
+
   if (!exists) return candidate;
-  
+
   // if exists, append random suffixes until unique
-  while(exists) {
-    candidate = normalizeHandle(`${baseHandle.replace(/^@/, "")}${randomSuffix(4)}`);
-    exists = await prisma.profile.findUnique({ where: { handle: candidate }});
+  while (exists) {
+    candidate = normalizeHandle(
+      `${baseHandle.replace(/^@/, "")}${randomSuffix(4)}`,
+    );
+    exists = await prisma.profile.findUnique({ where: { handle: candidate } });
   }
   return candidate;
 }
@@ -96,14 +162,14 @@ export async function findUserByClerkId(clerkId) {
   if (!clerkId) return null;
   return await prisma.user.findUnique({
     where: { clerkId: String(clerkId) },
-    include: { profile: true }
+    include: { profile: true },
   });
 }
 
 export async function findProfileByClerkId(clerkId) {
   if (!clerkId) return null;
   return await prisma.profile.findUnique({
-    where: { clerkId: String(clerkId) }
+    where: { clerkId: String(clerkId) },
   });
 }
 
@@ -111,68 +177,105 @@ export async function getProfileForClerkUser(clerkId) {
   return await findProfileByClerkId(clerkId);
 }
 
+export async function ensureProfileForAuthContext(authContext = {}) {
+  const clerkId = normalizeString(authContext?.userId);
+  if (!clerkId) return null;
+
+  const existingProfile = await findProfileByClerkId(clerkId);
+  if (existingProfile) return existingProfile;
+
+  const clerkUser = clerkUserFromAuthContext(authContext);
+  if (!clerkUser) return null;
+
+  const syncedUser = await upsertUserFromClerk(clerkUser);
+  return syncedUser?.profile || findProfileByClerkId(clerkId);
+}
+
 // Fired by webhook when user signs up or changes their Clerk profile
 export async function upsertUserFromClerk(clerkUser) {
   const clerkId = normalizeString(clerkUser?.id);
   if (!clerkId) throw new Error("Missing Clerk user ID");
 
-  const email = getPrimaryEmail(clerkUser);
+  const incomingEmail = getPrimaryEmail(clerkUser);
   const displayName = getDisplayName(clerkUser);
-  const firstName = normalizeString(clerkUser.first_name || clerkUser.firstName);
+  const firstName = normalizeString(
+    clerkUser.first_name || clerkUser.firstName,
+  );
   const lastName = normalizeString(clerkUser.last_name || clerkUser.lastName);
   const imageUrl = normalizeString(clerkUser.image_url || clerkUser.imageUrl);
 
-  const existingUser = await prisma.user.findUnique({ where: { clerkId } });
+  const existingUser = await prisma.user.findUnique({
+    where: { clerkId },
+    include: { profile: true },
+  });
 
   if (!existingUser) {
     // ---------------------------------------------
     // CREATE NEW USER & PROFILE
     // ---------------------------------------------
-    const handleCandidate = deriveHandleCandidate(clerkUser, email, displayName);
-    const handle = await getUniqueHandle(handleCandidate);
-    const profileId = handle.replace(/^@/, "");
+    const email = incomingEmail || getFallbackEmail(clerkId);
+    const createProfileData = buildProfileCreateData(
+      clerkUser,
+      email,
+      displayName,
+    );
+    const profileData = await createProfileData();
 
     const newUser = await prisma.user.create({
       data: {
         clerkId,
         email,
-        username: handle.replace(/^@/, ""),
+        username: profileData.handle.replace(/^@/, ""),
         firstName,
         lastName,
         imageUrl,
         profile: {
-          create: {
-            id: profileId,
-            name: displayName,
-            handle,
-            avatar: makeAvatar(displayName),
-            joined: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-          }
-        }
+          create: profileData,
+        },
       },
-      include: { profile: true }
+      include: { profile: true },
     });
     return newUser;
   } else {
     // ---------------------------------------------
     // UPDATE EXISTING USER
     // ---------------------------------------------
+    const email = incomingEmail || existingUser.email;
+    const createProfileData = buildProfileCreateData(
+      clerkUser,
+      email,
+      displayName,
+    );
+    const profileData = existingUser.profile ? null : await createProfileData();
     const updatedUser = await prisma.user.update({
       where: { clerkId },
       data: {
         email,
-        firstName,
-        lastName,
-        imageUrl
+        username:
+          profileData?.handle.replace(/^@/, "") || existingUser.username,
+        firstName: firstName || existingUser.firstName,
+        lastName: lastName || existingUser.lastName,
+        imageUrl: imageUrl || existingUser.imageUrl,
+        ...(profileData
+          ? {
+              profile: {
+                create: profileData,
+              },
+            }
+          : {}),
       },
-      include: { profile: true }
+      include: { profile: true },
     });
 
     return updatedUser;
   }
 }
 
-export async function patchUserByClerkId(clerkId, userPatch = {}, profilePatch = {}) {
+export async function patchUserByClerkId(
+  clerkId,
+  userPatch = {},
+  profilePatch = {},
+) {
   const id = normalizeString(clerkId);
   if (!id) throw new Error("Missing Clerk user ID");
 
@@ -183,14 +286,14 @@ export async function patchUserByClerkId(clerkId, userPatch = {}, profilePatch =
     user = await prisma.user.update({
       where: { clerkId: id },
       data: userPatch,
-      include: { profile: true }
+      include: { profile: true },
     });
   }
 
   if (Object.keys(profilePatch).length > 0) {
     await prisma.profile.update({
       where: { clerkId: id },
-      data: profilePatch
+      data: profilePatch,
     });
   }
 
@@ -202,7 +305,7 @@ export async function deleteUserByClerkId(clerkId) {
   if (!id) return false;
 
   try {
-    // Because we use onDelete: Cascade in schema.prisma, 
+    // Because we use onDelete: Cascade in schema.prisma,
     // deleting the User automatically deletes the Profile!
     await prisma.user.delete({ where: { clerkId: id } });
     return true;

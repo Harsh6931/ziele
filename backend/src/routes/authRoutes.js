@@ -5,7 +5,7 @@ import {
   requireAuthWithContext,
   requireUserId,
 } from "../middleware/authMiddleware.js";
-import { getProfileForClerkUser } from "../models/clerkSyncModel.js";
+import { ensureProfileForAuthContext } from "../models/clerkSyncModel.js";
 
 const router = express.Router();
 
@@ -44,29 +44,24 @@ router.get("/status", optionalAuth, (req, res) => {
  * Protected endpoint to validate Clerk middleware wiring.
  * Requires a valid Clerk session token.
  */
-router.get(
-  "/me",
-  requireAuthWithContext,
-  requireUserId,
-  async (req, res) => {
-    const clerkId = req.authContext.userId;
-    const profile = await getProfileForClerkUser(clerkId);
+router.get("/me", requireAuthWithContext, requireUserId, async (req, res) => {
+  const clerkId = req.authContext.userId;
+  const profile = await ensureProfileForAuthContext(req.authContext);
 
-    if (!profile) {
-      return res.status(404).json({
-        ok: false,
-        error:
-          "Authenticated user exists in Clerk but no local profile is synced yet.",
-        clerkId,
-      });
-    }
-
-    return res.json({
-      ok: true,
+  if (!profile) {
+    return res.status(404).json({
+      ok: false,
+      error:
+        "Authenticated user exists in Clerk but no local profile is synced yet.",
       clerkId,
-      profile,
     });
-  },
-);
+  }
+
+  return res.json({
+    ok: true,
+    clerkId,
+    profile,
+  });
+});
 
 export default router;
