@@ -20,14 +20,27 @@ import { appRouter } from "./trpc/routers/_app.js";
 
 const app = express();
 
+function normalizeOrigin(origin) {
+  return String(origin || "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\/$/, "");
+}
+
 const allowedOrigins =
   env.corsOrigins.length > 0
-    ? env.corsOrigins
+    ? env.corsOrigins.map(normalizeOrigin).filter(Boolean)
     : ["http://localhost:5173", "https://ziele-theta.vercel.app"];
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked origin: ${origin}`));
+    },
     credentials: true,
   }),
 );
