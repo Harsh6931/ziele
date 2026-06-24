@@ -156,7 +156,7 @@ function TrendingPageReal() {
                 <h3 className="trending-post-title">{post.title}</h3>
                 <p className="trending-post-summary">{post.summary || post.contentText}</p>
                 <div className="trending-post-meta">
-                  <span>{post.authorName}</span>
+                  <span>{post.authorHandle || post.authorName}</span>
                   <span> - </span>
                   <span>{post.readTime}</span>
                   <span> - </span>

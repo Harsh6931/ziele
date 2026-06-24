@@ -1,11 +1,34 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import { getPosts, reactToPost, toggleBookmark } from "../lib/apiClient";
 import FollowButton from "../components/FollowButton";
 import { formatCompactNumber } from "../lib/formatters";
+import { GuestPopup, useGuestGuard } from "../components/GuestGuard";
 import "../components/PostCard.css";
 
+/* ── Renders a circular author avatar: photo if available, letter otherwise ── */
+function AuthorAvatar({ src, name, size = 36 }) {
+  const [imgError, setImgError] = React.useState(false);
+  const letter = (name || "?").charAt(0).toUpperCase();
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        width={size}
+        height={size}
+        onError={() => setImgError(true)}
+        style={{ borderRadius: "50%", objectFit: "cover", width: size, height: size, flexShrink: 0 }}
+      />
+    );
+  }
+  return <div className="post-author-avatar">{letter}</div>;
+}
+
 function Home() {
+  const { isSignedIn } = useAuth();
+  const guard = useGuestGuard();
   const [posts, setPosts] = useState([]);
   const [reactionState, setReactionState] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -328,26 +351,38 @@ function Home() {
         return (
           <article key={post.id} className="post-card">
             <div className="post-header-top post-header-top--feed">
-              <div className="post-author-avatar">{post.avatar}</div>
+              <AuthorAvatar
+                src={post.authorPhotoUrl || post.avatarUrl}
+                name={post.authorHandle || post.authorName}
+              />
               <div className="post-author-info">
                 <div className="post-author-row">
                   <span className="post-author-name">
-                    {post.authorName}
+                    {post.authorHandle || post.authorName}
                     {post.premium && (
                       <span className="premium-check" title="Premium Post" style={{ marginLeft: "4px", color: "var(--accent-primary)", fontSize: "0.85em" }}>
                         ✓
                       </span>
                     )}
                   </span>
-                  <FollowButton
-                    profileId={post.profileId}
-                    profileName={post.authorName}
-                    initialIsFollowing={post.isFollowingAuthor}
-                    isOwnProfile={post.isOwnAuthor}
-                    className="follow-btn post-follow-btn"
-                  />
+                  {isSignedIn ? (
+                    <FollowButton
+                      profileId={post.profileId}
+                      profileName={post.authorHandle || post.authorName}
+                      initialIsFollowing={post.isFollowingAuthor}
+                      isOwnProfile={post.isOwnAuthor}
+                      className="follow-btn post-follow-btn"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="follow-btn post-follow-btn"
+                      onClick={guard.showPopup}
+                    >
+                      Follow
+                    </button>
+                  )}
                 </div>
-                <span className="post-author-handle">{post.authorHandle}</span>
               </div>
               <div className="post-header-actions">
                 <span className="post-time">{post.time}</span>
@@ -378,7 +413,7 @@ function Home() {
               <button
                 className="action-icon-btn like-btn"
                 title="Like"
-                onClick={() => onLike(post.id)}
+                onClick={() => isSignedIn ? onLike(post.id) : guard.showPopup()}
                 aria-pressed={Boolean(state?.liked)}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={state?.liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -390,7 +425,7 @@ function Home() {
               <button
                 className="action-icon-btn dislike-btn"
                 title="Dislike"
-                onClick={() => onDislike(post.id)}
+                onClick={() => isSignedIn ? onDislike(post.id) : guard.showPopup()}
                 aria-pressed={Boolean(state?.disliked)}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={state?.disliked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -429,7 +464,7 @@ function Home() {
               <button
                 className="action-icon-btn bookmark-btn"
                 title="Bookmark"
-                onClick={() => onBookmark(post.id)}
+                onClick={() => isSignedIn ? onBookmark(post.id) : guard.showPopup()}
                 aria-pressed={Boolean(state?.bookmarked)}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={state?.bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -441,6 +476,13 @@ function Home() {
           </article>
         );
       })}
+
+      {/* Guest popup */}
+      <GuestPopup
+        visible={guard.popupVisible}
+        isAnimating={guard.isAnimating}
+        onClose={guard.hidePopup}
+      />
     </div>
   );
 }

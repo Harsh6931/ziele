@@ -54,7 +54,7 @@ function BookmarksPageReal() {
       items = items.filter((post) => {
         const title = (post.title || "").toLowerCase();
         const summary = (post.summary || post.contentText || post.content || "").toLowerCase();
-        const author = (post.authorName || "").toLowerCase();
+        const author = (post.authorHandle || post.authorName || "").toLowerCase();
         const tags = (post.tags || []).map((tag) => String(tag).toLowerCase());
 
         return (
@@ -165,8 +165,10 @@ function BookmarksPageReal() {
                 <div className="bookmark-card-author">
                   <div className="bookmark-card-avatar">{post.avatar}</div>
                   <div>
-                    <span className="bookmark-card-name">{post.authorName}</span>
-                    <span className="bookmark-card-handle">{post.authorHandle}</span>
+                    {/* Show @handle as primary identity on bookmarks */}
+                    <span className="bookmark-card-name">
+                      {post.authorHandle || post.authorName}
+                    </span>
                   </div>
                 </div>
                 <div className="bookmark-card-actions">
@@ -208,4 +210,3 @@ function BookmarksPageReal() {
 }
 
 export default BookmarksPageReal;
-

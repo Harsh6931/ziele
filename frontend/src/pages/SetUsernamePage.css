@@ -1,0 +1,207 @@
+.set-username-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg-body, #0d0d10);
+}
+
+.set-username-card {
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  max-width: 420px;
+  width: 100%;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  animation: cardFadeUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes cardFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.set-username-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    var(--accent-primary, #ff5c9d),
+    var(--accent-secondary, #c44dff)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 auto 1.25rem;
+  box-shadow: 0 8px 24px rgba(255, 92, 157, 0.35);
+}
+
+.set-username-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main, #fff);
+  text-align: center;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.set-username-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-soft, #aaa);
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 0 1.75rem;
+}
+
+.set-username-loading {
+  text-align: center;
+  color: var(--text-soft, #aaa);
+  font-size: 0.9rem;
+}
+
+.set-username-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.set-username-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input, rgba(255, 255, 255, 0.06));
+  border: 1.5px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.set-username-input-wrap:focus-within {
+  border-color: var(--accent-primary, #ff5c9d);
+  box-shadow: 0 0 0 3px rgba(255, 92, 157, 0.12);
+}
+
+.set-username-prefix {
+  padding: 0 0.1rem 0 0.9rem;
+  color: var(--accent-primary, #ff5c9d);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.set-username-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-main, #fff);
+  font-size: 0.95rem;
+  padding: 0.75rem 0.9rem 0.75rem 0.4rem;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+}
+
+.set-username-input::placeholder {
+  color: var(--text-muted, #555);
+}
+
+.set-username-input--error {
+  /* error styles via wrapper */
+}
+
+.set-username-input-wrap:has(.set-username-input--error) {
+  border-color: #ff4d6d;
+}
+
+.set-username-preview {
+  font-size: 0.8rem;
+  color: var(--text-soft, #aaa);
+  margin: 0;
+  text-align: center;
+}
+
+.set-username-handle {
+  color: var(--accent-primary, #ff5c9d);
+  font-weight: 600;
+}
+
+.set-username-error {
+  font-size: 0.8rem;
+  color: #ff6b6b;
+  background: rgba(255, 80, 80, 0.08);
+  border: 1px solid rgba(255, 80, 80, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+.set-username-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.rule-ok,
+.rule-dim {
+  font-size: 0.75rem;
+  transition: color 0.2s ease;
+}
+
+.rule-ok {
+  color: #4ade80;
+}
+
+.rule-dim {
+  color: var(--text-muted, #555);
+}
+
+.set-username-btn {
+  width: 100%;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--accent-primary, #ff5c9d),
+    var(--accent-secondary, #c44dff)
+  );
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 16px rgba(255, 92, 157, 0.3);
+  margin-top: 0.25rem;
+}
+
+.set-username-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(255, 92, 157, 0.45);
+}
+
+.set-username-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.set-username-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

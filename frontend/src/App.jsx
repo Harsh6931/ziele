@@ -9,6 +9,7 @@ import Sidebar from "./components/Sidebar";
 import Feed from "./pages/Feed";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
+import SetUsernamePage from "./pages/SetUsernamePage";
 import Discover from "./pages/Discover";
 import PostDetail from "./pages/PostDetail";
 import CreatePost from "./pages/CreatePost";
@@ -24,6 +25,7 @@ import GenericPlaceholder from "./pages/GenericPlaceholder";
 import Analytics from "./pages/AnalyticsReal";
 import LandingPage from "./pages/LandingPage";
 import FloatingPanel from "./components/FloatingPanel";
+import BackendStatusBanner from "./components/BackendStatusBanner";
 
 // IMPORT: Clerk Auth helper components to handle route protection
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
@@ -101,7 +103,8 @@ function App() {
     location.pathname === "/sign-in" ||
     location.pathname === "/sign-up" ||
     location.pathname.startsWith("/sign-in/") ||
-    location.pathname.startsWith("/sign-up/");
+    location.pathname.startsWith("/sign-up/") ||
+    location.pathname === "/sso-callback";
 
   const hideSidebar =
     [
@@ -166,6 +169,7 @@ function App() {
   if (isLandingPage) {
     return (
       <div className="app">
+        <BackendStatusBanner />
         <LandingPage
           isDarkTheme={isDarkTheme}
           onToggleTheme={toggleTheme}
@@ -174,8 +178,23 @@ function App() {
     );
   }
 
+  // Auth pages: full-screen, no navbar/sidebar shell
+  if (authShellRoute) {
+    return (
+      <div className="app">
+        <BackendStatusBanner />
+        <Routes>
+          <Route path="/sign-in/*" element={<SignInPage />} />
+          <Route path="/sign-up/*" element={<SignUpPage />} />
+          <Route path="/sso-callback" element={<Navigate to="/feed" replace />} />
+        </Routes>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
+      <BackendStatusBanner />
       <FloatingPanel />
       <Navbar
         theme={theme}
@@ -188,19 +207,18 @@ function App() {
             {/* PUBLIC ROUTES: Accessible to everyone */}
             <Route path="/feed" element={<Feed />} />
             <Route path="/home" element={<Feed />} />
-            <Route path="/sign-in/*" element={<SignInPage />} />
-            <Route path="/sign-up/*" element={<SignUpPage />} />
+            <Route path="/set-username" element={<ProtectedRoute><SetUsernamePage /></ProtectedRoute>} />
             <Route path="/discover" element={<Discover />} />
             <Route path="/post/:id/:slug?" element={<PostDetail />} />
             <Route path="/trending" element={<TrendingPage />} />
             <Route path="/communities" element={<Communities />} />
+            {/* Profile: public route — guest guard handled inside Profile.jsx */}
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/profile/:id" element={<Profile />} />
             {/* PRIVATE ROUTES: Require user authentication via Clerk */}
             <Route path="/create" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
-
             {/* FULL PAGES */}
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
             <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />

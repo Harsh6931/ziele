@@ -1,0 +1,203 @@
+/* ─── Guest Popup Overlay ──────────────────────────────────────── */
+@keyframes guestOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes guestOverlayOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes guestCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.94);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+@keyframes guestCardOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+    filter: blur(3px);
+  }
+}
+@keyframes guestGlowPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(1.12); }
+}
+@keyframes guestIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}
+
+.guest-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.guest-popup-overlay--in  { animation: guestOverlayIn  0.22s ease forwards; }
+.guest-popup-overlay--out { animation: guestOverlayOut 0.28s ease forwards; }
+
+.guest-popup-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--bg-card) 92%, var(--primary) 8%) 0%,
+    var(--bg-card) 60%,
+    color-mix(in srgb, var(--bg-card) 95%, #60a5fa 5%) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--glass-border));
+  border-radius: 28px;
+  padding: 2.4rem 2rem 2rem;
+  text-align: center;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent),
+    0 32px 64px rgba(0, 0, 0, 0.52),
+    0 0 80px color-mix(in srgb, var(--primary) 14%, transparent);
+  overflow: hidden;
+}
+.guest-popup-card--in  { animation: guestCardIn  0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.guest-popup-card--out { animation: guestCardOut 0.26s ease forwards; }
+
+/* Ambient glow */
+.guest-popup-glow {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 36%, transparent), transparent 70%);
+  filter: blur(18px);
+  pointer-events: none;
+  animation: guestGlowPulse 3.5s ease-in-out infinite;
+}
+
+/* Close button */
+.guest-popup-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-card-2);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  line-height: 1;
+}
+.guest-popup-close:hover {
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  border-color: var(--glass-border-strong);
+  transform: scale(1.08);
+}
+
+/* Icon */
+.guest-popup-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--primary-muted);
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent);
+  color: var(--primary);
+  margin-bottom: 1.1rem;
+  animation: guestIconFloat 3s ease-in-out infinite;
+}
+
+.guest-popup-title {
+  margin: 0 0 0.55rem;
+  font-size: 1.3rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.guest-popup-desc {
+  margin: 0 0 1.5rem;
+  font-size: 0.92rem;
+  color: var(--text-soft);
+  line-height: 1.6;
+  max-width: 32ch;
+  margin-inline: auto;
+  margin-bottom: 1.5rem;
+}
+
+.guest-popup-actions {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.guest-popup-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  font-size: 0.94rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.guest-popup-btn--primary {
+  background: linear-gradient(130deg, var(--primary-strong), var(--primary));
+  color: #fff;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--primary) 38%, transparent);
+}
+.guest-popup-btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 48%, transparent);
+  filter: brightness(1.08);
+}
+
+.guest-popup-btn--secondary {
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  border-color: var(--glass-border-strong);
+}
+.guest-popup-btn--secondary:hover {
+  background: var(--bg-card-2);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--glass-border));
+  transform: translateY(-1px);
+}
+
+.guest-popup-footer {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}

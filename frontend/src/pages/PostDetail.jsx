@@ -273,18 +273,17 @@ function PostDetail() {
           <div className="post-author-avatar">{post.avatar}</div>
           <div className="post-author-info">
             <span className="post-author-name">
-              {post.authorName}
+              {post.authorHandle || post.authorName}
               {post.premium && (
                 <span className="premium-check" title="Premium Post" style={{ marginLeft: "4px", color: "var(--accent-primary)", fontSize: "0.85em" }}>
                   ✓
                 </span>
               )}
             </span>
-            <span className="post-author-handle">{post.authorHandle}</span>
           </div>
           <FollowButton
             profileId={post.profileId}
-            profileName={post.authorName}
+            profileName={post.authorHandle || post.authorName}
             initialIsFollowing={post.isFollowingAuthor}
             isOwnProfile={post.isOwnAuthor}
             className="follow-btn post-follow-btn"
@@ -609,10 +608,7 @@ function PostDetail() {
                   <div className="post-author-avatar">{related.avatar}</div>
                   <div className="post-author-info">
                     <span className="post-author-name">
-                      {related.authorName}
-                    </span>
-                    <span className="post-author-handle">
-                      {related.authorHandle}
+                      {related.authorHandle || related.authorName}
                     </span>
                   </div>
                   <span className="post-time">{related.time}</span>
