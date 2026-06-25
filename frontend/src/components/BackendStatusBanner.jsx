@@ -9,28 +9,37 @@ const INITIAL_DELAY_MS = 1500; // wait before showing banner to avoid flicker fo
 export default function BackendStatusBanner() {
   const [visible, setVisible] = React.useState(false);
   const [dismissed, setDismissed] = React.useState(false);
-  const timeoutRef = React.useRef(null);
+  const showTimerRef = React.useRef(null);
   const intervalRef = React.useRef(null);
   const mountedRef = React.useRef(true);
+  const dismissedRef = React.useRef(false);
+
+  // Keep the ref in sync with the state so the interval callback always reads the latest value
+  React.useEffect(() => {
+    dismissedRef.current = dismissed;
+  }, [dismissed]);
 
   React.useEffect(() => {
     mountedRef.current = true;
 
-    let showTimerId = null;
-
     const checkHealth = async () => {
       try {
         await fetchJson(HEALTH_URL, { skipAuth: true });
-        // Backend is up — hide banner
+        // Backend is up — hide banner and clear any pending show timer
         if (mountedRef.current) {
+          clearTimeout(showTimerRef.current);
+          showTimerRef.current = null;
           setVisible(false);
           clearInterval(intervalRef.current);
         }
       } catch {
-        // Backend not reachable yet — show banner after brief delay
-        if (mountedRef.current && !dismissed) {
-          showTimerId = setTimeout(() => {
-            if (mountedRef.current) setVisible(true);
+        // Backend not reachable yet — schedule banner after brief delay (only if not already pending)
+        if (mountedRef.current && !dismissedRef.current && showTimerRef.current === null) {
+          showTimerRef.current = setTimeout(() => {
+            showTimerRef.current = null;
+            if (mountedRef.current && !dismissedRef.current) {
+              setVisible(true);
+            }
           }, INITIAL_DELAY_MS);
         }
       }
@@ -45,10 +54,10 @@ export default function BackendStatusBanner() {
     return () => {
       mountedRef.current = false;
       clearInterval(intervalRef.current);
-      clearTimeout(showTimerId);
-      clearTimeout(timeoutRef.current);
+      clearTimeout(showTimerRef.current);
+      showTimerRef.current = null;
     };
-  }, [dismissed]);
+  }, []); // runs once — refs handle latest state inside the interval callback
 
   if (!visible || dismissed) return null;
 
@@ -63,7 +72,11 @@ export default function BackendStatusBanner() {
           className="backend-banner__dismiss"
           type="button"
           aria-label="Dismiss backend status"
-          onClick={() => setDismissed(true)}
+          onClick={() => {
+            clearTimeout(showTimerRef.current);
+            showTimerRef.current = null;
+            setDismissed(true);
+          }}
         >
           ✕
         </button>
